@@ -45,18 +45,19 @@ public class ItemServiceIntegrationTest {
     private final ItemService itemService;
 
     @Test
-    @Sql({"/db/sql/users.sql"})
     void addNewItem() {
+        User defaultUser = makeDefaultUser();
+        em.persist(defaultUser);
         AddItemRequest request = makeItemRequest("https://bit.ly/3vRVvO0", Set.of());
-        itemService.addNewItem(1L, request);
+        itemService.addNewItem(defaultUser.getId(), request);
 
         TypedQuery<Item> query = em.createQuery("select it from Item as it where it.url = :url", Item.class);
         Item item = query.setParameter("url", request.getUrl())
                 .getSingleResult();
 
         assertThat(item.getId(), notNullValue());
-        assertThat(item.getUser().getId(), equalTo(1L));
-        assertThat(item.getUser().getEmail(), equalTo("atabekbekseiit@gmail.com"));
+        assertThat(item.getUser().getId(), equalTo(defaultUser.getId()));
+        assertThat(item.getUser().getEmail(), equalTo("email"));
         assertThat(item.getUser().getState(), equalTo(UserState.ACTIVE));
         assertThat(item.getUrl(), equalTo("https://bit.ly/3vRVvO0"));
         assertThat(item.getHasImage(), equalTo(true));
@@ -64,20 +65,20 @@ public class ItemServiceIntegrationTest {
     }
 
     @Test
-    @Sql({"/db/sql/users.sql"})
     void getItems_shouldReturnAllSavedItems_whenFilterAreNotStrong() {
 
         // given
-        long userId = 1L;
-        User user = getEntity(userId, User.class);
+        User defaultUser = makeDefaultUser();
+        em.persist(defaultUser);
+
         List<Item> items = List.of(
-                makeItem(user, "https://bit.ly/3vRVvO0", "https://practicum.yandex.ru/java-developer/", "text",
+                makeItem(defaultUser, "https://bit.ly/3vRVvO0", "https://practicum.yandex.ru/java-developer/", "text",
                         "Курс «Java-разработчик» с нуля: онлайн-обучение Java-программированию для начинающих — Яндекс Практикум", true, true,
                         daysFromNow(730), true, Set.of("yandex", "practicum")),
-                makeItem(user, "https://some-video-url", "https://some-resolved-url-video.com", "video",
+                makeItem(defaultUser, "https://some-video-url", "https://some-resolved-url-video.com", "video",
                         "some title", false, true,
                         daysFromNow(365), false, Set.of("video")),
-                makeItem(user, "https://some-image-url", "https://some-resolved-url-image.com", "image",
+                makeItem(defaultUser, "https://some-image-url", "https://some-resolved-url-image.com", "image",
                         "some title", true, false,
                         daysFromNow(300), true, Set.of("image"))
         );
@@ -88,7 +89,7 @@ public class ItemServiceIntegrationTest {
 
         // when
         List<ItemDto> result = itemService.getItems(new GetItemRequest(
-                1L,
+                defaultUser.getId(),
                 GetItemRequest.State.ALL,
                 GetItemRequest.ContentType.ALL,
                 GetItemRequest.Sort.NEWEST,
@@ -101,49 +102,75 @@ public class ItemServiceIntegrationTest {
     }
 
     @Test
-    @Sql({"/db/sql/users.sql", "/db/sql/items.sql"})
-    void edit_shouldReturnUpdatedItem_whenEverythingIsOK() {
+    void edit_shouldReturnUpdatedItemWithReplacedTags_whenReplaceTagsIsTrue() {
 
         // given
-        long userId = 1L;
-        User user = getEntity(userId, User.class);
+        User defaultUser = makeDefaultUser();
+        em.persist(defaultUser);
 
-        long itemId = 1L;
-        Item item = getEntity(itemId, Item.class);
-        Set<String> oldTags = new HashSet<>(item.getTags());
+        Item defaultItem = makeDefaultItem(defaultUser);
+        em.persist(defaultItem);
+        Set<String> oldTags = new HashSet<>(defaultItem.getTags());
 
         // when
         ModifyItemRequest editRequest = new ModifyItemRequest();
-        editRequest.setId(itemId);
+        editRequest.setId(defaultItem.getId());
         editRequest.setUnread(false);
         editRequest.setReplaceTags(true);
         editRequest.setTags(Set.of("shuk", "laki"));
-        itemService.edit(userId, editRequest);
+        itemService.edit(defaultUser.getId(), editRequest);
 
         // then
-        Item editedItem = getEntity(itemId, Item.class);
+        Item editedItem = getEntity(defaultItem.getId(), Item.class);
         assertThat(editedItem.getUnread(), equalTo(false));
         assertThat(editedItem.getTags(), equalTo(Set.of("shuk", "laki")));
-
-        assertThat(user, equalTo(item.getUser()));
         assertThat(oldTags, not(equalTo(editedItem.getTags())));
-        assertThat(oldTags.size(), not(equalTo(editedItem.getTags().size())));
+    }
+
+    @Test
+    void edit_shouldReturnUpdatedItemWithAddedTags_whenReplaceTagsIsFalse() {
+
+        // given
+        User defaultUser = makeDefaultUser();
+        em.persist(defaultUser);
+
+        Item defaultItem = makeDefaultItem(defaultUser);
+        em.persist(defaultItem);
+        Set<String> oldTags = new HashSet<>(defaultItem.getTags());
+
+        // when
+        ModifyItemRequest editRequest = new ModifyItemRequest();
+        editRequest.setId(defaultItem.getId());
+        editRequest.setUnread(false);
+        editRequest.setReplaceTags(false);
+        editRequest.setTags(Set.of("shuk", "laki"));
+        itemService.edit(defaultUser.getId(), editRequest);
+
+        // then
+        Item editedItem = getEntity(defaultItem.getId(), Item.class);
+        assertThat(editedItem.getUnread(), equalTo(false));
+
+        oldTags.addAll(editedItem.getTags());
+        assertThat(editedItem.getTags(), equalTo(oldTags));
     }
 
     @Test
     @Sql({"/db/sql/users.sql", "/db/sql/items.sql"})
-    void deleteItem_shouldThrowException_whenItemIsDeleted() {
+    void deleteItem_shouldThrowNoResultException_whenGettingDeletedItem() {
         // given
-        long itemId = 1L;
+        User defaultUser = makeDefaultUser();
+        em.persist(defaultUser);
 
-        long userId = 1L;
+        Item defaultItem = makeDefaultItem(defaultUser);
+        em.persist(defaultItem);
 
         // when
-        itemService.deleteItem(userId, itemId);
+        itemService.deleteItem(defaultUser.getId(), defaultItem.getId());
+
         // then
         assertThrows(
                 NoResultException.class,
-                () -> getEntity(itemId, Item.class));
+                () -> getEntity(defaultItem.getId(), Item.class));
     }
 
     private <T> T getEntity(long id, Class<T> entityClass) {
@@ -218,6 +245,23 @@ public class ItemServiceIntegrationTest {
                 .build();
     }
 
+    private Item makeDefaultItem(
+            User user
+    ) {
+        return Item.builder()
+                .user(user)
+                .url("https://bit.ly/3vRVvO0")
+                .resolvedUrl("https://practicum.yandex.ru/java-developer/")
+                .mimeType("text")
+                .title("Курс «Java-разработчик» с нуля: онлайн-обучение Java-программированию для начинающих — Яндекс Практикум")
+                .hasImage(true)
+                .hasVideo(false)
+                .dateResolved(daysFromNow(-365))
+                .unread(true)
+                .tags(new HashSet<>(Set.of("yandex", "practicum")))
+                .build();
+    }
+
     private User makeUser(
             String lName,
             String fName,
@@ -231,6 +275,17 @@ public class ItemServiceIntegrationTest {
         user.setRegistrationDate(regDate);
         user.setEmail(email);
         user.setState(state);
+        return user;
+    }
+
+    private User makeDefaultUser(
+    ) {
+        User user = new User();
+        user.setLastName("lastname");
+        user.setFirstName("firstname");
+        user.setRegistrationDate(Instant.now());
+        user.setEmail("email");
+        user.setState(UserState.ACTIVE);
         return user;
     }
 }

@@ -40,10 +40,10 @@ public class Item {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @Column(name = "url")
+    @Column(name = "url", length = 1500)
     private String url;
 
-    @Column(name = "resolved_url")
+    @Column(name = "resolved_url", length = 1500)
     private String resolvedUrl;
 
     @Column(name = "mime_type")
