@@ -26,7 +26,10 @@ import static org.hamcrest.Matchers.hasSize;
 
 @Transactional
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
-@TestPropertySource(properties = {"jdbc.url=jdbc:postgresql://localhost:5432/test"})
+@TestPropertySource(properties = {
+        "jdbc.url=jdbc:postgresql://localhost:5432/test",
+        "hibernate.hbm2ddl.auto=update"
+})
 @SpringJUnitConfig({AppConfig.class, PersistenceConfig.class, UserServiceImpl.class})
 class UserServiceImplTest {
 

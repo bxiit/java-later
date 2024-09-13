@@ -1,12 +1,12 @@
 package ru.practicum.item;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
 import jakarta.persistence.TypedQuery;
 import lombok.RequiredArgsConstructor;
-import org.instancio.junit.InstancioExtension;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,18 +22,24 @@ import ru.practicum.user.UserState;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @Transactional
-@ExtendWith(InstancioExtension.class)
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 @SpringJUnitConfig({AppConfig.class, PersistenceConfig.class, ItemServiceImpl.class, UrlMetaDataRetrieverImpl.class})
+@TestPropertySource(properties = {
+        "jdbc.url=jdbc:postgresql://localhost:5432/test",
+        "hibernate.hbm2ddl.auto=update"
+})
 public class ItemServiceIntegrationTest {
     private final EntityManager em;
     private final ItemService itemService;
@@ -62,7 +68,7 @@ public class ItemServiceIntegrationTest {
     void getItems_shouldReturnAllSavedItems_whenFilterAreNotStrong() {
 
         // given
-        Long userId = 1L;
+        long userId = 1L;
         User user = getEntity(userId, User.class);
         List<Item> items = List.of(
                 makeItem(user, "https://bit.ly/3vRVvO0", "https://practicum.yandex.ru/java-developer/", "text",
@@ -99,22 +105,48 @@ public class ItemServiceIntegrationTest {
     void edit_shouldReturnUpdatedItem_whenEverythingIsOK() {
 
         // given
-        Long userId = 1L;
+        long userId = 1L;
         User user = getEntity(userId, User.class);
 
-        Long itemId = 1L;
+        long itemId = 1L;
         Item item = getEntity(itemId, Item.class);
+        Set<String> oldTags = new HashSet<>(item.getTags());
 
         // when
         ModifyItemRequest editRequest = new ModifyItemRequest();
+        editRequest.setId(itemId);
         editRequest.setUnread(false);
         editRequest.setReplaceTags(true);
         editRequest.setTags(Set.of("shuk", "laki"));
         itemService.edit(userId, editRequest);
+
+        // then
+        Item editedItem = getEntity(itemId, Item.class);
+        assertThat(editedItem.getUnread(), equalTo(false));
+        assertThat(editedItem.getTags(), equalTo(Set.of("shuk", "laki")));
+
+        assertThat(user, equalTo(item.getUser()));
+        assertThat(oldTags, not(equalTo(editedItem.getTags())));
+        assertThat(oldTags.size(), not(equalTo(editedItem.getTags().size())));
     }
 
+    @Test
+    @Sql({"/db/sql/users.sql", "/db/sql/items.sql"})
+    void deleteItem_shouldThrowException_whenItemIsDeleted() {
+        // given
+        long itemId = 1L;
 
-    private <T> T getEntity(Long id, Class<T> entityClass) {
+        long userId = 1L;
+
+        // when
+        itemService.deleteItem(userId, itemId);
+        // then
+        assertThrows(
+                NoResultException.class,
+                () -> getEntity(itemId, Item.class));
+    }
+
+    private <T> T getEntity(long id, Class<T> entityClass) {
         String sqlQuery = "select en from %s en where en.id = :id".formatted(entityClass.getSimpleName());
         TypedQuery<T> query = em.createQuery(sqlQuery, entityClass);
         return query

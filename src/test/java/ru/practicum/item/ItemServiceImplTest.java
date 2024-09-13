@@ -55,7 +55,7 @@ class ItemServiceImplTest {
         when(urlMetaDataRetriever.retrieve(anyString()))
                 .thenAnswer(inv -> {
                     String url = inv.getArgument(0, String.class);
-                    return makeUrkMetaData(url, url, "text/html", "test", false, false, hoursFromNow(2));
+                    return makeUrlMetaData(url, url, "text/html", "test", false, false, hoursFromNow(2));
                 });
         when(itemRepository.findByUserAndResolvedUrl(any(User.class), anyString()))
                 .thenReturn(Optional.empty());
@@ -107,7 +107,7 @@ class ItemServiceImplTest {
         return user;
     }
 
-    private UrlMetaDataRetriever.UrlMetadata makeUrkMetaData(
+    private UrlMetaDataRetriever.UrlMetadata makeUrlMetaData(
             String normalUrl,
             String resolvedUrl,
             String mimeType,
