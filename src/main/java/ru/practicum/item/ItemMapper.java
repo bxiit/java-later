@@ -1,54 +1,59 @@
 package ru.practicum.item;
 
-import ru.practicum.item.dto.AddItemRequest;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import ru.practicum.item.dto.ItemDto;
 import ru.practicum.user.User;
 
-import java.util.LinkedList;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ItemMapper {
+    private static final DateTimeFormatter dtFormatter = DateTimeFormatter
+            .ofPattern("yyyy.MM.dd HH:mm:ss")
+            .withZone(ZoneOffset.UTC);
 
-    public static Item mapToEntity(AddItemRequest request, User user) {
+    public static Item mapToNewItem(UrlMetaDataRetriever.UrlMetadata result, User user, Set<String> tags) {
         Item item = new Item();
         item.setUser(user);
-        item.setUrl(request.getUrl());
-        item.setTags(request.getTags());
-
-        return item;
-    }
-
-    public static Item mapToEntity(UrlMetaDataRetriever.UrlMetadata urlMetadata, User user, Set<String> tags) {
-        Item item = new Item();
-        item.setUrl(urlMetadata.getNormalUrl());
-        item.setResolvedUrl(urlMetadata.getResolvedUrl());
-        item.setMimeType(urlMetadata.getMimeType());
-        item.setTitle(urlMetadata.getTitle());
-        item.setHasImage(urlMetadata.isHasImage());
-        item.setHasVideo(urlMetadata.isHasVideo());
-        item.setDateResolved(urlMetadata.getDateResolved());
-        item.setUser(user);
+        item.setUrl(result.getNormalUrl());
+        item.setResolvedUrl(result.getResolvedUrl());
+        item.setMimeType(result.getMimeType());
+        item.setTitle(result.getTitle());
+        item.setHasImage(result.isHasImage());
+        item.setHasVideo(result.isHasVideo());
+        item.setDateResolved(result.getDateResolved());
         item.setTags(tags);
         item.setUnread(Boolean.TRUE);
         return item;
     }
 
-    public static ItemDto mapToDto(Item item) {
+    public static ItemDto mapToItemDto(Item item) {
         return ItemDto.builder()
                 .id(item.getId())
-                .userId(item.getUser().getId())
-                .url(item.getUrl())
+                .title(item.getTitle())
+                .normalUrl(item.getUrl())
+                .resolvedUrl(item.getResolvedUrl())
+                .hasImage(item.getHasImage())
+                .hasVideo(item.getHasVideo())
+                .mimeType(item.getMimeType())
+                .unread(item.getUnread())
+                .dateResolved(dtFormatter.format(item.getDateResolved()))
+                // Нужно скопировать все элементы в новую коллекцию - чтобы запустить механизм ленивой загрузки.
+                .tags(new HashSet<>(item.getTags()))
                 .build();
     }
 
-    public static List<ItemDto> mapToDto(Iterable<Item> items) {
-        List<ItemDto> itemDtos = new LinkedList<>();
-
+    public static List<ItemDto> mapToItemDto(Iterable<Item> items) {
+        List<ItemDto> dtos = new ArrayList<>();
         for (Item item : items) {
-            ItemDto itemDto = mapToDto(item);
-            itemDtos.add(itemDto);
+            dtos.add(mapToItemDto(item));
         }
-        return itemDtos;
+        return dtos;
     }
 }

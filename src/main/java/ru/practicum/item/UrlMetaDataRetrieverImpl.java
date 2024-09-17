@@ -10,7 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeType;
-import ru.practicum.exception.ItemRetrieverException;
+import ru.practicum.common.ItemRetrieverException;
 
 import java.io.File;
 import java.io.IOException;

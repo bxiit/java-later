@@ -1,33 +1,23 @@
 package ru.practicum.item.dto;
 
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
+import ru.practicum.item.UrlMetaDataRetriever;
+import ru.practicum.item.UrlMetaDataRetrieverImpl;
 
-import java.time.Instant;
 import java.util.Set;
 
-@Data
-@Builder
+@Getter
+@Builder(toBuilder = true)
 public class ItemDto {
-    private Long id;
-
-    private Long userId;
-
-    private String url;
-
-    private String resolvedUrl;
-
-    private String mimeType;
-
-    private String title;
-
-    private Boolean hasImage;
-
-    private Boolean hasVideo;
-
-    private Instant dateResolved;
-
-    private Boolean unread;
-
-    private Set<String> tags;
+    private final Long id;
+    private final String normalUrl;
+    private final String resolvedUrl;
+    private final String mimeType;
+    private final String title;
+    private final Boolean hasImage;
+    private final Boolean hasVideo;
+    private final Boolean unread;
+    private final String dateResolved;
+    private final Set<String> tags;
 }

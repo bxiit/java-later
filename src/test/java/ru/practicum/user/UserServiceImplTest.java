@@ -3,7 +3,6 @@ package ru.practicum.user;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import lombok.RequiredArgsConstructor;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
@@ -12,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.config.AppConfig;
 import ru.practicum.config.PersistenceConfig;
 import ru.practicum.user.dto.UserDto;
-import ru.practicum.user.mapper.UserMapper;
 
 import java.util.List;
 
@@ -30,7 +28,7 @@ import static org.hamcrest.Matchers.hasSize;
         "jdbc.url=jdbc:postgresql://localhost:5432/test",
         "hibernate.hbm2ddl.auto=update"
 })
-@SpringJUnitConfig({AppConfig.class, PersistenceConfig.class, UserServiceImpl.class})
+@SpringJUnitConfig({AppConfig.class, PersistenceConfig.class, UserServiceImpl.class, UserMapper.class})
 class UserServiceImplTest {
 
     private final EntityManager em;
@@ -67,7 +65,7 @@ class UserServiceImplTest {
         );
 
         for (UserDto user : sourceUsers) {
-            User entity = UserMapper.mapToModel(user);
+            User entity = UserMapper.mapToNewUser(user);
             em.persist(entity);
         }
         em.flush();

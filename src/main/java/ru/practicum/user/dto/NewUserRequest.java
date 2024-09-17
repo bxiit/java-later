@@ -1,7 +1,10 @@
 package ru.practicum.user.dto;
 
-public record NewUserRequest(String firstName,
-                             String lastName,
-                             String email) {
+import lombok.Data;
 
+@Data
+public class NewUserRequest {
+    String firstName;
+    String lastName;
+    String email;
 }

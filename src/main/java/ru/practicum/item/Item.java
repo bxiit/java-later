@@ -11,11 +11,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import ru.practicum.user.User;
 
 import java.time.Instant;
@@ -26,9 +24,7 @@ import java.util.Set;
 @Getter
 @Setter
 @Entity
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
+@ToString
 @Table(name = "items", schema = "public")
 public class Item {
 
@@ -36,6 +32,7 @@ public class Item {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
@@ -67,6 +64,18 @@ public class Item {
     @CollectionTable(name = "tags", joinColumns = @JoinColumn(name = "item_id"))
     @Column(name = "name")
     private Set<String> tags = new HashSet<>();
+
+    public UrlMetaDataRetriever.UrlMetadata getUrlMetadata() {
+        return new UrlMetaDataRetrieverImpl.UrlMetadataImpl(
+                this.url,
+                this.resolvedUrl,
+                this.mimeType,
+                this.title,
+                this.hasImage,
+                this.hasVideo,
+                this.dateResolved
+                );
+    }
 
     @Override
     public int hashCode() {

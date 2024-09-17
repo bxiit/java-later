@@ -5,7 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.practicum.exception.NotFoundException;
+import ru.practicum.common.NotFoundException;
 import ru.practicum.item.dto.AddItemRequest;
 import ru.practicum.item.dto.ItemDto;
 import ru.practicum.user.User;
@@ -71,8 +71,7 @@ class ItemServiceImplTest {
                 .build();
         ItemDto addedNewItem = itemService.addNewItem(1L, request);
         assertThat(1L, equalTo(addedNewItem.getId()));
-        assertThat(1L, equalTo(addedNewItem.getUserId()));
-        assertThat("https://google.com", equalTo(addedNewItem.getUrl()));
+        assertThat("https://google.com", equalTo(addedNewItem.getNormalUrl()));
 
         verify(userRepository).findById(anyLong());
         verify(itemRepository).save(any());

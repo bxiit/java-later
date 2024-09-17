@@ -17,6 +17,7 @@ import ru.practicum.item.dto.ItemDto;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Set;
 
 import static org.hamcrest.Matchers.notNullValue;
@@ -32,6 +33,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringJUnitWebConfig({ItemController.class, ItemControllerTestConfig.class, WebConfig.class})
 class ItemControllerTestWithContext {
 
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter
+            .ofPattern("yyyy.MM.dd hh:mm:ss")
+            .withZone(ZoneOffset.UTC);
     private final ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     private final ItemService itemService;
@@ -62,11 +66,10 @@ class ItemControllerTestWithContext {
                 .thenReturn(
                         ItemDto.builder()
                                 .id(1L)
-                                .userId(1L)
-                                .url("https://google.com")
+                                .normalUrl("https://google.com")
                                 .resolvedUrl("https://google.com")
                                 .title("google")
-                                .dateResolved(hoursFromNow(-2))
+                                .dateResolved(instantToString(hoursFromNow(-2)))
                                 .hasImage(true)
                                 .hasVideo(false)
                                 .unread(true)
@@ -91,5 +94,9 @@ class ItemControllerTestWithContext {
     private Instant hoursFromNow(int hours) {
         LocalDateTime localDateTime = LocalDateTime.now().plusHours(hours);
         return localDateTime.toInstant(ZoneOffset.UTC);
+    }
+
+    private String instantToString(Instant instant) {
+        return FORMATTER.format(instant);
     }
 }

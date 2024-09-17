@@ -1,6 +1,4 @@
-package ru.practicum.exception;
-
-import java.net.URISyntaxException;
+package ru.practicum.common;
 
 public class ItemRetrieverException extends RuntimeException {
 

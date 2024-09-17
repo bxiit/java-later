@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.user.dto.UserDto;
-import ru.practicum.user.mapper.UserMapper;
 
 import java.util.List;
 
@@ -20,15 +19,15 @@ class UserServiceImpl implements UserService {
     @Transactional
     public List<UserDto> getAllUsers() {
         return repository.findAll().stream()
-                .map(UserMapper::mapToDto)
+                .map(UserMapper::mapToUserDto)
                 .toList();
     }
 
     @Override
     public UserDto saveUser(UserDto request) {
         log.info("Got {} to save", request);
-        User user = UserMapper.mapToModel(request);
+        User user = UserMapper.mapToNewUser(request);
         repository.save(user);
-        return UserMapper.mapToDto(user);
+        return UserMapper.mapToUserDto(user);
     }
 }

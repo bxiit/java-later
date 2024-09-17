@@ -1,8 +1,7 @@
-package ru.practicum.note.mapper;
+package ru.practicum.note;
 
 import lombok.experimental.UtilityClass;
 import ru.practicum.item.Item;
-import ru.practicum.note.ItemNote;
 import ru.practicum.note.dto.ItemNoteDto;
 
 @UtilityClass

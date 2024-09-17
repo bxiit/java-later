@@ -10,11 +10,9 @@ public interface ItemNoteRepository extends JpaRepository<ItemNote, Long> {
 
     List<ItemNote> findAllByItemUrlContainingAndItemUserId(String itemUrl, Long userId);
 
-    @Query("""
-            select itn from ItemNote itn
-            join itn.item as i
-            where i.user.id = ?1 and ?2 member of i.tags
-            """)
+    @Query("select itn from ItemNote itn\n" +
+           "            join itn.item as i\n" +
+           "            where i.user.id = ?1 and ?2 member of i.tags")
     List<ItemNote> findItemNotesByUsersTags(Long userId, String tag);
 
     List<ItemNote> findAllByItemUserId(Long userId, Pageable pageable);

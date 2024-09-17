@@ -3,11 +3,10 @@ package ru.practicum.note;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import ru.practicum.exception.NotFoundException;
+import ru.practicum.common.NotFoundException;
 import ru.practicum.item.Item;
 import ru.practicum.item.ItemRepository;
 import ru.practicum.note.dto.ItemNoteDto;
-import ru.practicum.note.mapper.ItemNoteMapper;
 
 import java.util.List;
 

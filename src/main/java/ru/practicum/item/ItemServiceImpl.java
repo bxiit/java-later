@@ -8,8 +8,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.practicum.exception.AccessException;
-import ru.practicum.exception.NotFoundException;
+import ru.practicum.common.AccessException;
+import ru.practicum.common.NotFoundException;
 import ru.practicum.item.dto.AddItemRequest;
 import ru.practicum.item.dto.GetItemRequest;
 import ru.practicum.item.dto.ItemDto;
@@ -18,6 +18,7 @@ import ru.practicum.user.User;
 import ru.practicum.user.UserRepository;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -30,28 +31,30 @@ public class ItemServiceImpl implements ItemService {
     private final ItemRepository itemRepository;
     private final UserRepository userRepository;
     private final UrlMetaDataRetriever urlMetaDataRetriever;
+    private final ItemMapper itemMapper;
 
     @Override
     @Transactional
     public ItemDto addNewItem(Long userId, AddItemRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User not found"));
+                .orElseThrow(() -> new NotFoundException("errors.404.users"));
         UrlMetaDataRetriever.UrlMetadata urlMetadata = urlMetaDataRetriever.retrieve(request.getUrl());
 
         final Item item;
         Optional<Item> maybeExistingItem = itemRepository.findByUserAndResolvedUrl(user, urlMetadata.getResolvedUrl());
 
         if (maybeExistingItem.isEmpty()) {
-            item = itemRepository.save(ItemMapper.mapToEntity(urlMetadata, user, request.getTags()));
+            item = itemRepository.save(ItemMapper.mapToNewItem(urlMetadata, user, request.getTags()));
         } else {
             item = maybeExistingItem.get();
             if (request.getTags() != null && !request.getTags().isEmpty()) {
+                item.setTags(new HashSet<>(item.getTags()));
                 item.getTags().addAll(request.getTags());
                 itemRepository.save(item);
             }
         }
 
-        return ItemMapper.mapToDto(item);
+        return ItemMapper.mapToItemDto(item);
     }
 
     @Override
@@ -72,7 +75,7 @@ public class ItemServiceImpl implements ItemService {
 
         Iterable<Item> items = itemRepository.findAll(makeSingleExpression(conditions), pageRequest);
         return StreamSupport.stream(items.spliterator(), false)
-                .map(ItemMapper::mapToDto)
+                .map(ItemMapper::mapToItemDto)
                 .toList();
     }
 
@@ -82,7 +85,7 @@ public class ItemServiceImpl implements ItemService {
         BooleanExpression byUserId = QItem.item.user.id.eq(userId);
         BooleanExpression byAnyTag = QItem.item.tags.any().in(tags);
         Iterable<Item> items = itemRepository.findAll(byUserId.and(byAnyTag));
-        return ItemMapper.mapToDto(items);
+        return ItemMapper.mapToItemDto(items);
     }
 
     @Override
