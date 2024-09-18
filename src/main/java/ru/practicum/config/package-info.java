@@ -1,4 +1,3 @@
-
 @NonNullApi
 package ru.practicum.config;
 

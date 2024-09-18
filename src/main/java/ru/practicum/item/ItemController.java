@@ -67,7 +67,7 @@ public class ItemController {
     public void editItem(
             @RequestHeader("X-Later-User-Id") long userId,
             @RequestBody ModifyItemRequest request
-            ) {
+    ) {
         itemService.edit(userId, request);
     }
 }

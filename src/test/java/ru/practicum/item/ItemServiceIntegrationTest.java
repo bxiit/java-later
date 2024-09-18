@@ -9,14 +9,12 @@ import org.junit.jupiter.api.function.Executable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.common.AccessException;
+import ru.practicum.common.ItemRetrieverException;
 import ru.practicum.common.NotFoundException;
-import ru.practicum.common.advice.GlobalExceptionHandler;
 import ru.practicum.config.AppConfig;
-import ru.practicum.config.MessageSourceConfig;
 import ru.practicum.config.PersistenceConfig;
 import ru.practicum.item.dto.AddItemRequest;
 import ru.practicum.item.dto.GetItemRequest;
@@ -25,14 +23,7 @@ import ru.practicum.item.dto.ModifyItemRequest;
 import ru.practicum.user.User;
 import ru.practicum.user.UserState;
 
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -52,26 +43,21 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 @SpringJUnitConfig({AppConfig.class, PersistenceConfig.class,
         ItemServiceImpl.class, UrlMetaDataRetrieverImpl.class,
-        ItemMapper.class,
-        MessageSourceConfig.class, GlobalExceptionHandler.class})
+        ItemMapper.class})
 @TestPropertySource(properties = {
         "jdbc.url=jdbc:postgresql://localhost:5432/test",
         "hibernate.hbm2ddl.auto=update"
 })
-public class ItemServiceIntegrationTest {
-
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter
-            .ofPattern("yyyy.MM.dd HH:mm:ss")
-            .withZone(ZoneOffset.UTC);
+public class ItemServiceIntegrationTest extends ItemServiceTest {
 
     private final EntityManager em;
     private final ItemService itemService;
 
     @Test
-    void addNewItem_shouldReturnAddedItemFromDB_whenEverythingIsOK() {
+    void addNewItem_shouldReturnAddedItem_whenEverythingIsOK() {
         User defaultUser = makeDefaultUser();
         em.persist(defaultUser);
-        AddItemRequest request = makeItemRequest("https://bit.ly/3vRVvO0", Set.of());
+        AddItemRequest request = makeItemRequest("https://github.com/", Set.of());
         itemService.addNewItem(defaultUser.getId(), request);
 
         TypedQuery<Item> query = em.createQuery("select it from Item as it where it.url = :url", Item.class);
@@ -82,9 +68,115 @@ public class ItemServiceIntegrationTest {
         assertThat(item.getUser().getId(), equalTo(defaultUser.getId()));
         assertThat(item.getUser().getEmail(), equalTo("email"));
         assertThat(item.getUser().getState(), equalTo(UserState.ACTIVE));
-        assertThat(item.getUrl(), equalTo("https://bit.ly/3vRVvO0"));
+        assertThat(item.getUrl(), equalTo("https://github.com/"));
+        assertThat(item.getHasVideo(), equalTo(true));
         assertThat(item.getHasImage(), equalTo(true));
         assertThat(item.getUnread(), equalTo(true));
+    }
+
+    @Test
+    void addNewItem_shouldReturnAddedItem_whenEverythingIsOKAndContentTypeIsImage() {
+        User defaultUser = makeDefaultUser();
+        em.persist(defaultUser);
+        AddItemRequest request = makeItemRequest("https://httpbin.org/image", Set.of());
+        itemService.addNewItem(defaultUser.getId(), request);
+
+        TypedQuery<Item> query = em.createQuery("select it from Item as it where it.url = :url", Item.class);
+        Item item = query.setParameter("url", request.getUrl())
+                .getSingleResult();
+
+        assertThat(item.getId(), notNullValue());
+        assertThat(item.getUser().getId(), equalTo(defaultUser.getId()));
+        assertThat(item.getUser().getEmail(), equalTo("email"));
+        assertThat(item.getUser().getState(), equalTo(UserState.ACTIVE));
+        assertThat(item.getUrl(), equalTo("https://httpbin.org/image"));
+        assertThat(item.getHasVideo(), equalTo(false));
+        assertThat(item.getHasImage(), equalTo(true));
+        assertThat(item.getUnread(), equalTo(true));
+    }
+
+    @Test
+    void addNewItem_shouldThrowItemRetrieverException_whenUnauthorized() {
+        // given
+        User defaultUser = makeDefaultUser();
+        em.persist(defaultUser);
+        AddItemRequest request = makeItemRequest("https://httpbin.org/status/401", Set.of());
+
+        // when
+        Executable addNewItem = () -> itemService.addNewItem(defaultUser.getId(), request);
+
+        // then
+        ItemRetrieverException itemRetrieverException = assertThrows(ItemRetrieverException.class, addNewItem);
+        assertThat(itemRetrieverException.getMessage(), equalTo("There is no access to the resource at the specified URL: https://httpbin.org/status/401"));
+    }
+
+    @Test
+    void addNewItem_shouldThrowItemRetrieverException_whenUrlIsMalformed() {
+        // given
+        User defaultUser = makeDefaultUser();
+        em.persist(defaultUser);
+        AddItemRequest request = makeItemRequest("ht^tp://invalid_uri.com", Set.of());
+
+        // when
+        Executable addNewItem = () -> itemService.addNewItem(defaultUser.getId(), request);
+
+        // then
+        ItemRetrieverException itemRetrieverException = assertThrows(ItemRetrieverException.class, addNewItem);
+        assertThat(itemRetrieverException.getMessage(), equalTo("The URL is malformed: ht^tp://invalid_uri.com"));
+    }
+
+    @Test
+    void addNewItem_shouldThrowItemRetrieverException_whenResponseStatusIs400() {
+        // given
+        User defaultUser = makeDefaultUser();
+        em.persist(defaultUser);
+        AddItemRequest request = makeItemRequest("https://httpbin.org/status/400", Set.of());
+
+        // when
+        Executable addNewItem = () -> itemService.addNewItem(defaultUser.getId(), request);
+
+        // then
+        ItemRetrieverException itemRetrieverException = assertThrows(ItemRetrieverException.class, addNewItem);
+        assertThat(
+                itemRetrieverException.getMessage(),
+                equalTo("Cannot get the data on the item because the server returned an error.Response status: 400 BAD_REQUEST")
+        );
+    }
+
+    @Test
+    void addNewItem_shouldThrowItemRetrieverException_whenResponseStatusIs600() {
+        // given
+        User defaultUser = makeDefaultUser();
+        em.persist(defaultUser);
+        AddItemRequest request = makeItemRequest("https://httpbin.org/status/600", Set.of());
+
+        // when
+        Executable addNewItem = () -> itemService.addNewItem(defaultUser.getId(), request);
+
+        // then
+        ItemRetrieverException itemRetrieverException = assertThrows(ItemRetrieverException.class, addNewItem);
+        assertThat(
+                itemRetrieverException.getMessage(),
+                equalTo("The server returned an unknown status code: 600")
+        );
+    }
+
+    @Test
+    void addNewItem_shouldThrowItemRetrieverException_whenResponseContentTypeIsNotSupported() {
+        // given
+        User defaultUser = makeDefaultUser();
+        em.persist(defaultUser);
+        AddItemRequest request = makeItemRequest("https://httpbin.org/json", Set.of());
+
+        // when
+        Executable addNewItem = () -> itemService.addNewItem(defaultUser.getId(), request);
+
+        // then
+        ItemRetrieverException itemRetrieverException = assertThrows(ItemRetrieverException.class, addNewItem);
+        assertThat(
+                itemRetrieverException.getMessage(),
+                equalTo("The content type [ application/json ] at the specified URL is not supported.")
+        );
     }
 
     @Test
@@ -174,7 +266,7 @@ public class ItemServiceIntegrationTest {
         em.persist(defaultUser);
 
         List<Item> sourceItems = List.of(
-                makeItem(defaultUser, "https://bit.ly/3vRVvO0", "https://practicum.yandex.ru/java-developer/", "text",
+                makeItem(defaultUser, "https://bit.ly/3vRVvO0", "https://practicum.yandex.ru/java-developer/", "text/html",
                         "Курс «Java-разработчик» с нуля: онлайн-обучение Java-программированию для начинающих — Яндекс Практикум", true, true,
                         daysFromNow(-730), true, Set.of("yandex", "practicum")),
                 makeItem(defaultUser, "https://some-video-url", "https://some-resolved-url-video.com", "video",
@@ -183,7 +275,7 @@ public class ItemServiceIntegrationTest {
                 makeItem(defaultUser, "https://some-image-url", "https://some-resolved-url-image.com", "image",
                         "some title", true, false,
                         daysFromNow(-300), true, Set.of("image")),
-                makeItem(defaultUser, "https://some-notion-url", "https://some-resolved-url-notion.com", "text",
+                makeItem(defaultUser, "https://some-notion-url", "https://some-resolved-url-notion.com", "text/html",
                         "some note title", false, false,
                         daysFromNow(-15), false, Set.of("notion", "notes")),
                 makeItem(defaultUser, "https://some-pachka-url", "https://some-resolved-url-pachka.com", "image",
@@ -195,22 +287,26 @@ public class ItemServiceIntegrationTest {
             em.persist(sourceItem);
         }
 
-        List<ItemDto> targetItems = itemService.getItems(new GetItemRequest(
+        GetItemRequest getItemRequest = new GetItemRequest(
                 defaultUser.getId(),
                 GetItemRequest.State.UNREAD,
                 GetItemRequest.ContentType.ARTICLE,
                 GetItemRequest.Sort.NEWEST,
                 5,
                 emptyList()
-        ));
+        );
 
+        // when
+        List<ItemDto> targetItems = itemService.getItems(getItemRequest);
+
+        // then
         assertThat(targetItems.size(), equalTo(1));
         assertThat(targetItems.getFirst(), hasProperty("tags", containsInAnyOrder("yandex", "practicum")));
         assertThat(targetItems, hasItem(allOf(
                 hasProperty("id", notNullValue()),
                 hasProperty("normalUrl", equalTo("https://bit.ly/3vRVvO0")),
                 hasProperty("resolvedUrl", equalTo("https://practicum.yandex.ru/java-developer/")),
-                hasProperty("mimeType", equalTo("text")),
+                hasProperty("mimeType", equalTo("text/html")),
                 hasProperty("title", equalTo("Курс «Java-разработчик» с нуля: онлайн-обучение Java-программированию для начинающих — Яндекс Практикум")),
                 hasProperty("hasImage", equalTo(true)),
                 hasProperty("hasVideo", equalTo(true)),
@@ -231,11 +327,8 @@ public class ItemServiceIntegrationTest {
         Set<String> oldTags = new HashSet<>(defaultItem.getTags());
 
         // when
-        ModifyItemRequest editRequest = new ModifyItemRequest();
-        editRequest.setId(defaultItem.getId());
-        editRequest.setUnread(false);
-        editRequest.setReplaceTags(true);
-        editRequest.setTags(Set.of("shuk", "laki"));
+        var editRequest = ModifyItemRequest.of(defaultItem.getId(), false,
+                new HashSet<>(Set.of("shuk", "laki")), true);
         itemService.edit(defaultUser.getId(), editRequest);
 
         // then
@@ -296,7 +389,6 @@ public class ItemServiceIntegrationTest {
     }
 
     @Test
-    @Sql({"/db/sql/users.sql", "/db/sql/items.sql"})
     void deleteItem_shouldThrowNoResultException_whenGettingDeletedItem() {
         // given
         User defaultUser = makeDefaultUser();
@@ -314,137 +406,11 @@ public class ItemServiceIntegrationTest {
                 () -> getEntity(defaultItem.getId(), Item.class));
     }
 
-    private UrlMetaDataRetrieverImpl.UrlMetadataImpl extractUrlMetaDataFromItemDto(ItemDto itemDto) {
-        return new UrlMetaDataRetrieverImpl.UrlMetadataImpl(itemDto.getNormalUrl(), itemDto.getResolvedUrl(), itemDto.getMimeType(), itemDto.getTitle(), itemDto.getHasImage(), itemDto.getHasVideo(), stringToInstant(itemDto.getDateResolved()));
-    }
-
-    private UrlMetaDataRetrieverImpl.UrlMetadataImpl extractUrlMetaDataFromItem(Item item) {
-        return new UrlMetaDataRetrieverImpl.UrlMetadataImpl(item.getUrl(), item.getResolvedUrl(), item.getMimeType(), item.getTitle(), item.getHasImage(), item.getHasVideo(), item.getDateResolved());
-    }
-
     private <T> T getEntity(long id, Class<T> entityClass) {
         String sqlQuery = "select en from %s en where en.id = :id".formatted(entityClass.getSimpleName());
         TypedQuery<T> query = em.createQuery(sqlQuery, entityClass);
         return query
                 .setParameter("id", id)
                 .getSingleResult();
-    }
-
-    private Instant daysFromNow(int days) {
-        LocalDateTime localDateTime = LocalDateTime.now().plusHours(days);
-        return localDateTime.toInstant(ZoneOffset.UTC);
-    }
-
-    private AddItemRequest makeItemRequest(String url, Set<String> tags) {
-        return AddItemRequest.builder()
-                .url(url)
-                .tags(tags)
-                .build();
-    }
-
-    private ItemDto makeItemDto(
-            User user,
-            boolean unread,
-            Set<String> tags,
-            UrlMetaDataRetriever.UrlMetadata urlMetadata
-    ) {
-        return mapToDto(
-                user.getId(),
-                urlMetadata,
-                unread,
-                tags
-        );
-    }
-
-    public ItemDto mapToDto(Long userId, UrlMetaDataRetriever.UrlMetadata urlMetadata, boolean unread, Set<String> tags) {
-        if (userId == null && urlMetadata == null && tags == null) {
-            return null;
-        }
-
-        ItemDto.ItemDtoBuilder itemDto = ItemDto.builder();
-
-        if (urlMetadata != null) {
-            itemDto.normalUrl(urlMetadata.getNormalUrl());
-            itemDto.resolvedUrl(urlMetadata.getResolvedUrl());
-            itemDto.mimeType(urlMetadata.getMimeType());
-            itemDto.title(urlMetadata.getTitle());
-            itemDto.hasImage(urlMetadata.isHasImage());
-            itemDto.hasVideo(urlMetadata.isHasVideo());
-            itemDto.dateResolved(instantToString(urlMetadata.getDateResolved()));
-        }
-        itemDto.unread(unread);
-        if (tags != null) {
-            itemDto.tags(new LinkedHashSet<>(tags));
-        }
-
-        return itemDto.build();
-    }
-
-    private Item makeItem(
-            User user,
-            String url,
-            String resolvedUrl,
-            String mimeType,
-            String title,
-            Boolean hasImage,
-            Boolean hasVideo,
-            Instant dateResolved,
-            Boolean unread,
-            Set<String> tags
-    ) {
-        Item item = new Item();
-
-        item.setUser(user);
-        item.setUrl(url);
-        item.setResolvedUrl(resolvedUrl);
-        item.setMimeType(mimeType);
-        item.setTitle(title);
-        item.setHasImage(hasImage);
-        item.setHasVideo(hasVideo);
-        item.setDateResolved(dateResolved);
-        item.setUnread(unread);
-        item.setTags(tags);
-
-        return item;
-    }
-
-    private Item makeDefaultItem(
-            User user
-    ) {
-        Item item = new Item();
-
-        item.setUser(user);
-        item.setUrl("https://bit.ly/3vRVvO0");
-        item.setResolvedUrl("https://practicum.yandex.ru/java-developer/");
-        item.setMimeType("text");
-        item.setTitle("Курс «Java-разработчик» с нуля: онлайн-обучение Java-программированию для начинающих — Яндекс Практикум");
-        item.setHasImage(true);
-        item.setHasVideo(false);
-        item.setDateResolved(daysFromNow(-365));
-        item.setUnread(true);
-        item.setTags(new HashSet<>(Set.of("yandex", "practicum")));
-
-        return item;
-    }
-
-    private User makeDefaultUser(
-    ) {
-        User user = new User();
-        user.setLastName("lastname");
-        user.setFirstName("firstname");
-        user.setRegistrationDate(Instant.now());
-        user.setEmail("email");
-        user.setState(UserState.ACTIVE);
-        return user;
-    }
-
-    private Instant stringToInstant(String string) {
-        LocalDateTime ldt = LocalDateTime.parse(string, FORMATTER);
-        ZonedDateTime ztd = ldt.atZone(ZoneId.systemDefault());
-        return ztd.toInstant();
-    }
-
-    private String instantToString(Instant instant) {
-        return FORMATTER.format(instant);
     }
 }

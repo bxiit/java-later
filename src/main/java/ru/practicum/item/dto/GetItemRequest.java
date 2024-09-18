@@ -25,9 +25,9 @@ public class GetItemRequest {
     @RequiredArgsConstructor
     public enum ContentType implements ContentTypeCondition {
         ALL(null),
-        ARTICLE(QItem.item.mimeType.eq("text")),
-        IMAGE(QItem.item.mimeType.eq("img")),
-        VIDEO(QItem.item.mimeType.eq("video"));
+        ARTICLE(QItem.item.mimeType.startsWith("text")),
+        IMAGE(QItem.item.mimeType.startsWith("img")),
+        VIDEO(QItem.item.mimeType.startsWith("video"));
         private final BooleanExpression expr;
 
         @Override

@@ -106,6 +106,8 @@ public class ItemServiceImpl implements ItemService {
         } else {
             item.getTags().addAll(request.getTags());
         }
+
+        itemRepository.save(item);
     }
 
     private BooleanExpression makeSingleExpression(List<BooleanExpression> conditions) {

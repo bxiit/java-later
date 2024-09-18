@@ -56,8 +56,9 @@ public class UrlMetaDataRetrieverImpl implements UrlMetaDataRetriever {
         } else if (mediaType.isCompatibleWith(MimeType.valueOf("video/*"))) {
             result = handleVideo(resp.uri());
         } else {
-            throw new ItemRetrieverException("The content type [ + mediaType" +
-                                             "            + ] at the specified URL is not supported.");
+            throw new ItemRetrieverException("The content type [ "
+                                             + mediaType +
+                                             " ] at the specified URL is not supported.");
         }
         return result.toBuilder()
                 .normalUrl(urlString)
@@ -144,7 +145,7 @@ public class UrlMetaDataRetrieverImpl implements UrlMetaDataRetriever {
 
     @lombok.Value
     @Builder(toBuilder = true)
-    static class UrlMetadataImpl implements UrlMetadata {
+    public static class UrlMetadataImpl implements UrlMetadata {
         String normalUrl;
         String resolvedUrl;
         String mimeType;

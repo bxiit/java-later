@@ -17,8 +17,4 @@ public class ModifyItemRequest {
     private Set<String> tags;
 
     private Boolean replaceTags;
-
-    public boolean hasTags() {
-        return tags != null && !tags.isEmpty();
-    }
 }

@@ -65,18 +65,6 @@ public class Item {
     @Column(name = "name")
     private Set<String> tags = new HashSet<>();
 
-    public UrlMetaDataRetriever.UrlMetadata getUrlMetadata() {
-        return new UrlMetaDataRetrieverImpl.UrlMetadataImpl(
-                this.url,
-                this.resolvedUrl,
-                this.mimeType,
-                this.title,
-                this.hasImage,
-                this.hasVideo,
-                this.dateResolved
-                );
-    }
-
     @Override
     public int hashCode() {
         return getClass().hashCode();

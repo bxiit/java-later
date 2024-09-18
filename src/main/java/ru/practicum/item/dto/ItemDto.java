@@ -2,8 +2,6 @@ package ru.practicum.item.dto;
 
 import lombok.Builder;
 import lombok.Getter;
-import ru.practicum.item.UrlMetaDataRetriever;
-import ru.practicum.item.UrlMetaDataRetrieverImpl;
 
 import java.util.Set;
 
