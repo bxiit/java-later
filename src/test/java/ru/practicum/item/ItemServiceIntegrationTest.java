@@ -14,7 +14,9 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.common.AccessException;
 import ru.practicum.common.NotFoundException;
+import ru.practicum.common.advice.GlobalExceptionHandler;
 import ru.practicum.config.AppConfig;
+import ru.practicum.config.MessageSourceConfig;
 import ru.practicum.config.PersistenceConfig;
 import ru.practicum.item.dto.AddItemRequest;
 import ru.practicum.item.dto.GetItemRequest;
@@ -50,7 +52,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 @SpringJUnitConfig({AppConfig.class, PersistenceConfig.class,
         ItemServiceImpl.class, UrlMetaDataRetrieverImpl.class,
-        ItemMapper.class})
+        ItemMapper.class,
+        MessageSourceConfig.class, GlobalExceptionHandler.class})
 @TestPropertySource(properties = {
         "jdbc.url=jdbc:postgresql://localhost:5432/test",
         "hibernate.hbm2ddl.auto=update"
@@ -92,7 +95,6 @@ public class ItemServiceIntegrationTest {
 
         NotFoundException notFoundException = assertThrows(NotFoundException.class, () -> itemService.addNewItem(notExistingUserId, request));
         assertEquals(HttpStatus.NOT_FOUND, notFoundException.getHttpStatus());
-        assertEquals("Пользователь не найден", notFoundException.getMessage());
     }
 
     @Test
@@ -166,12 +168,12 @@ public class ItemServiceIntegrationTest {
     }
 
     @Test
-    void getItems() {
+    void getItems_shouldReturnOnlyOneItem_whenContentTypeIsTextAndUnreadIsTrue() {
         // given
         final User defaultUser = makeDefaultUser();
         em.persist(defaultUser);
 
-        List<Item> items = List.of(
+        List<Item> sourceItems = List.of(
                 makeItem(defaultUser, "https://bit.ly/3vRVvO0", "https://practicum.yandex.ru/java-developer/", "text",
                         "Курс «Java-разработчик» с нуля: онлайн-обучение Java-программированию для начинающих — Яндекс Практикум", true, true,
                         daysFromNow(-730), true, Set.of("yandex", "practicum")),
@@ -186,30 +188,35 @@ public class ItemServiceIntegrationTest {
                         daysFromNow(-15), false, Set.of("notion", "notes")),
                 makeItem(defaultUser, "https://some-pachka-url", "https://some-resolved-url-pachka.com", "image",
                         "some chat title", false, false,
-                        daysFromNow(-1), false, Set.of("pachka", "messenger"))
+                        daysFromNow(-1), true, Set.of("pachka", "messenger"))
         );
 
-        for (Item item : items) {
-            em.persist(item);
+        for (Item sourceItem : sourceItems) {
+            em.persist(sourceItem);
         }
 
         List<ItemDto> targetItems = itemService.getItems(new GetItemRequest(
                 defaultUser.getId(),
-                GetItemRequest.State.READ,
+                GetItemRequest.State.UNREAD,
                 GetItemRequest.ContentType.ARTICLE,
                 GetItemRequest.Sort.NEWEST,
                 5,
                 emptyList()
         ));
 
-        for (ItemDto targetItem : targetItems) {
-            Item item = ItemMapper.mapToNewItem(
-                    extractUrlMetaDataFromItemDto(targetItem),
-                    defaultUser,
-                    targetItem.getTags()
-            );
-            em.persist(item);
-        }
+        assertThat(targetItems.size(), equalTo(1));
+        assertThat(targetItems.getFirst(), hasProperty("tags", containsInAnyOrder("yandex", "practicum")));
+        assertThat(targetItems, hasItem(allOf(
+                hasProperty("id", notNullValue()),
+                hasProperty("normalUrl", equalTo("https://bit.ly/3vRVvO0")),
+                hasProperty("resolvedUrl", equalTo("https://practicum.yandex.ru/java-developer/")),
+                hasProperty("mimeType", equalTo("text")),
+                hasProperty("title", equalTo("Курс «Java-разработчик» с нуля: онлайн-обучение Java-программированию для начинающих — Яндекс Практикум")),
+                hasProperty("hasImage", equalTo(true)),
+                hasProperty("hasVideo", equalTo(true)),
+                hasProperty("unread", equalTo(true)),
+                hasProperty("dateResolved", notNullValue())
+        )));
     }
 
     @Test
@@ -258,7 +265,7 @@ public class ItemServiceIntegrationTest {
 
         // then
         AccessException accessException = assertThrows(AccessException.class, editItem);
-
+        assertEquals(HttpStatus.FORBIDDEN, accessException.getHttpStatus());
     }
 
     @Test
